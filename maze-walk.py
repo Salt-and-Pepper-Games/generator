@@ -49,6 +49,16 @@ def build_grid(width, height):
 
 def generate(width, height, x_start, y_start):
 	grid = build_grid(width, height)
+
+	# initializing each block to a random color
+	for i in xrange(width):
+		for j in xrange(height):
+			if not (i == 0 and j == 0):
+				block_color = random.randint(0, 7)
+				grid[i][j][block_color].empty = True
+				for color in xrange(8):
+					grid[i][j][color].is_column_taken = True
+
 	# print grid[0][0][0].planar_neighbors
 	#grid[0][0][0].visited = True
 	walls = make_move_if_valid(grid, None, grid[0][0][0], SWITCH)
@@ -134,7 +144,9 @@ def get_switch_walls(grid, x, y, bitmask):
 def make_move_if_valid(grid, n1, n2, move_type):
 	new_walls = []
 	# print move_type
-	if move_type is SWITCH and not n2.visited and not n2.is_column_taken:
+	# if move_type is SWITCH and not n2.visited and not n2.is_column_taken:
+	if move_type is SWITCH and not n2.visited:
+
 		# print("Deleting column")
 		# checking if it's okay to delete this block on EVERY floor
 		# to do this, we need to check that we won't create a loop in the path on every floor
@@ -142,6 +154,7 @@ def make_move_if_valid(grid, n1, n2, move_type):
 		ok_to_switch = True
 		neighbor_counts = []
 		switch_color = 0 if n1 is None else get_switch_color(n1.color, n2.color)
+		# print "Switch color %d at %d, %d" % (switch_color, n2.x, n2.y)
 		for color in xrange(8):
 			node = grid[n2.x][n2.y][color]
 			if n1 is None or n1.color == n2.color:
