@@ -19,6 +19,8 @@ class Node:
 		self.is_switch = False
 		self.switched_node = None
 
+		self.searched = False
+
 def build_grid(width, height):
 	grid = []
 	for x in xrange(width):
@@ -47,31 +49,61 @@ def build_grid(width, height):
 					grid[x][y][color].planar_neighbors.append(grid[neighbor[0]][neighbor[1]][color])
 	return grid
 
-def generate(width, height, x_start, y_start):
+def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, drill_prob=.3):
 	grid = build_grid(width, height)
 
 	# initializing each block to a random color
-	for i in xrange(width):
-		for j in xrange(height):
-			if not (i == 0 and j == 0):
-				block_color = random.randint(0, 7)
-				grid[i][j][block_color].empty = True
-				for color in xrange(8):
-					grid[i][j][color].is_column_taken = True
+	# for i in xrange(width):
+	# 	for j in xrange(height):
+	# 		if not (i == 0 and j == 0):
+	# 			block_color = random.randint(1, 7)
+	# 			grid[i][j][block_color].empty = True
+	# 			for color in xrange(8):
+	# 				grid[i][j][color].is_column_taken = True
 
 	# print grid[0][0][0].planar_neighbors
 	#grid[0][0][0].visited = True
-	walls = make_move_if_valid(grid, None, grid[0][0][0], SWITCH)
+	empty_walls = []
+	switch_walls = []
+	drill_walls = []
+	walls = make_move_if_valid(grid, None, grid[x_start][y_start][0], SWITCH)
+	for wall in walls:
+		if wall[2] == SWITCH:
+			if wall[0].color == wall[1].color:
+				empty_walls.append(wall)
+			else:
+				switch_walls.append(wall)
+		else:
+			drill_walls.append(wall)
 
-	while len(walls) > 0:
+	while len(empty_walls) > 0 or len(switch_walls) > 0 or len(drill_walls) > 0:
+		empty_switch_boundary = empty_prob * len(empty_walls)
+		switch_drill_boundary = empty_switch_boundary + switch_prob * len(switch_walls)
+		total = switch_drill_boundary + drill_prob * len(drill_walls)
+
+		roulette = random.random() * total
+		if roulette < empty_switch_boundary:
+			walls = empty_walls
+		elif roulette < switch_drill_boundary:
+			walls = switch_walls
+		else:
+			walls = drill_walls
+
 		index = random.randint(0, len(walls) - 1)
 		n1, n2, move_type = walls[index]
 		# print("(%d, %d) => (%d, %d)" % (wall[0].x, wall[0].y, wall[1].x, wall[1].y))
 		new_walls = make_move_if_valid(grid, n1, n2, move_type)
-		walls.extend(new_walls)
+		for wall in new_walls:
+			if wall[2] == SWITCH:
+				if wall[0].color == wall[1].color:
+					empty_walls.append(wall)
+				else:
+					switch_walls.append(wall)
+			else:
+				drill_walls.append(wall)
 		del walls[index]
 
-	replace_black_blocks(grid)
+	# replace_black_blocks(grid)
 	return grid
 
 def get_visited_neighbor_count(node):
@@ -141,11 +173,14 @@ def get_switch_walls(grid, x, y, bitmask):
 		new_walls.append((grid[x][y][color], grid[x][y][color ^ bitmask]))
 	return new_walls
 
+# TODO look at a move before it's made and see if it would result in a neighbor being forced to be non-passable on all levels
+# this would mean looking through all neighbors on all levels and seeing if it would have two visited neighbors after the move
+
 def make_move_if_valid(grid, n1, n2, move_type):
 	new_walls = []
 	# print move_type
-	# if move_type is SWITCH and not n2.visited and not n2.is_column_taken:
-	if move_type is SWITCH and not n2.visited:
+	if move_type is SWITCH and not n2.visited and not n2.is_column_taken:
+	# if move_type is SWITCH and not n2.visited:
 
 		# print("Deleting column")
 		# checking if it's okay to delete this block on EVERY floor
@@ -171,7 +206,7 @@ def make_move_if_valid(grid, n1, n2, move_type):
 					ok_to_switch = False
 					break
 		if ok_to_switch:
-			print (() if n1 is None else (n1.x, n1.y, n1.color)), (n2.x, n2.y, n2.color), switch_color
+			# print (() if n1 is None else (n1.x, n1.y, n1.color)), (n2.x, n2.y, n2.color), switch_color
 			# print("Ok to delete")
 			for node in n2.entire_column:
 				node.is_switch = True
@@ -218,11 +253,35 @@ def replace_black_blocks(grid):
 						# mark_visited(grid[i][j][color])
 						grid[i][j][color].empty = True
 						found_color = True
-						print "Replaced block at %d, %d" % (i, j)
+						# print "Replaced block at %d, %d" % (i, j)
 						break
 				if not found_color:
-					print "Can't replace black block at %d, %d" % (i, j)
+					pass
+					# print "Can't replace black block at %d, %d" % (i, j)
 
+
+
+# this doesn't work perfectly right now, sometimes distances are too big
+def pick_end_block(start, width, height):
+	distances = [[[9999999999 for color in xrange(8)] for y in xrange(width)] for x in xrange(width)]
+	distances[start.x][start.y][start.color] = 0
+	max_distance = 0
+	end_block = (0, 0)
+	queue = [start]
+	while len(queue) > 0:
+		node = queue.pop()
+		node.searched = True
+		for neighbor in node.planar_neighbors + [node.switched_node]:
+			if not neighbor is None:
+				if neighbor.searched:
+					distances[node.x][node.y][node.color] = distances[neighbor.x][neighbor.y][neighbor.color] + 1
+				elif neighbor.visited:
+					queue.append(neighbor)
+		min_dist = min([distances[n.x][n.y][n.color] for n in node.entire_column])
+		if min_dist > max_distance:
+			max_distance = min_dist
+			end_block = (node.x, node.y)
+	return end_block, max_distance
 
 
 def node_to_char(node):
@@ -234,7 +293,9 @@ def node_to_char(node):
 			empty_count += 1
 			empty_color = col_neighbor.color
 	if empty_count == 0:
-		return '#'
+		# in the future there should not be any unpassable blocks at all
+		# but for now just replace them with white blocks
+		return 'w'
 	elif empty_count == 1:
 		return colors[empty_color].lower()
 	elif empty_count == 8:
@@ -243,8 +304,9 @@ def node_to_char(node):
 		else:
 			return ' '
 	else:
-		print "Invalid column"
-		print [n.empty for n in node.entire_column]
+		pass
+		# print "Invalid column"
+		# print [n.empty for n in node.entire_column]
 
 def print_grid(grid, width, height):
 	print "%d %d" % (width, height)
@@ -255,10 +317,14 @@ def print_grid(grid, width, height):
 			row += node_to_char(grid[i][j][0]) + ' '
 		print row
 
-width = 6
-height = 6
+width = 10
+height = 10
 grid = generate(width, height, 0, 0)
 print_grid(grid, width, height)
+# block, dist = pick_end_block(grid[0][0][0], width, height)
+# print "End block"
+# print block
+# print dist
 
 
 
