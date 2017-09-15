@@ -308,9 +308,12 @@ def node_to_char(node):
 		# print "Invalid column"
 		# print [n.empty for n in node.entire_column]
 
-def print_grid(grid, width, height):
-	print "%d %d" % (width, height)
-	print 0
+def print_grid(grid, width, height, start=(0, 0), end=None):
+	if end is None:
+		end = (width-1, height-1)
+	print "%d %d" % (start[0], start[1])
+	print "%d %d" % (end[0], end[1])
+	print "%d %d" % (height, width)
 	for i in xrange(width):
 		row = ""
 		for j in xrange(height):
