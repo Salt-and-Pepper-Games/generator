@@ -1,3 +1,4 @@
+
 import random
 
 SWITCH = 1
@@ -263,7 +264,7 @@ def replace_black_blocks(grid):
 
 # this doesn't work perfectly right now, sometimes distances are too big
 def pick_end_block(start, width, height):
-	distances = [[[9999999999 for color in xrange(8)] for y in xrange(width)] for x in xrange(width)]
+	distances = [[[9999999999 for color in xrange(8)] for y in xrange(height)] for x in xrange(width)]
 	distances[start.x][start.y][start.color] = 0
 	max_distance = 0
 	end_block = (0, 0)
@@ -271,16 +272,17 @@ def pick_end_block(start, width, height):
 	while len(queue) > 0:
 		node = queue.pop()
 		node.searched = True
-		for neighbor in node.planar_neighbors + [node.switched_node]:
-			if not neighbor is None:
-				if neighbor.searched:
-					distances[node.x][node.y][node.color] = distances[neighbor.x][neighbor.y][neighbor.color] + 1
-				elif neighbor.visited:
-					queue.append(neighbor)
-		min_dist = min([distances[n.x][n.y][n.color] for n in node.entire_column])
-		if min_dist > max_distance:
-			max_distance = min_dist
-			end_block = (node.x, node.y)
+		if node.empty:
+			for neighbor in node.planar_neighbors + [node.switched_node]:
+				if not neighbor is None:
+					if neighbor.searched and neighbor.empty:
+						distances[node.x][node.y][node.color] = distances[neighbor.x][neighbor.y][neighbor.color] + 1
+					elif neighbor.visited:
+						queue.insert(0, neighbor)
+			min_dist = min([distances[n.x][n.y][n.color] for n in node.entire_column])
+			if min_dist > max_distance:
+				max_distance = min_dist
+				end_block = (node.x, node.y)
 	return end_block, max_distance
 
 
@@ -313,21 +315,27 @@ def print_grid(grid, width, height, start=(0, 0), end=None):
 		end = (width-1, height-1)
 	print "%d %d" % (start[0], start[1])
 	print "%d %d" % (end[0], end[1])
-	print "%d %d" % (height, width)
-	for i in xrange(width):
+	print "%d %d" % (width, height)
+	for j in xrange(height):
 		row = ""
-		for j in xrange(height):
+		for i in xrange(width):
 			row += node_to_char(grid[i][j][0]) + ' '
 		print row
 
-width = 10
-height = 10
+width = 20
+height = 20
 grid = generate(width, height, 0, 0)
-print_grid(grid, width, height)
-# block, dist = pick_end_block(grid[0][0][0], width, height)
+block, dist = pick_end_block(grid[0][0][0], width, height)
+for color in xrange(8):
+	node = grid[block[0]][block[1]][color]
+	node.visited = True
+	node.empty = True
+	node.is_switch = True
+	node.switched_node = node
+print_grid(grid, width, height, end=block)
 # print "End block"
 # print block
-# print dist
+print dist
 
 
 
