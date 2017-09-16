@@ -176,11 +176,49 @@ def get_switch_walls(grid, x, y, bitmask):
 
 # TODO look at a move before it's made and see if it would result in a neighbor being forced to be non-passable on all levels
 # this would mean looking through all neighbors on all levels and seeing if it would have two visited neighbors after the move
+def drill_would_create_unpassable_block(node):
+	for neighbor in node.planar_neighbors:
+		is_unpassable = True
+		for col_node in neighbor.entire_column:
+			# if every neighbor already has two visited neighbors and the neighbor on this floor has one, we can't do it
+			if col_node.is_switch or col_node.is_column_taken or not col_node.empty:
+				is_unpassable = False
+				break
+			count = get_visited_neighbor_count(col_node)
+			if node.color == col_node.color:
+				count += 1
+			if count < 2:
+				# there's still a color where this is passable
+				is_unpassable = False
+				break
+		if is_unpassable:
+			print "Unpassable block from drill blocked",node.x,node.y
+			return True
+	# only return false if none of the neighbors would be unpassable
+	return False
+
+def switch_would_create_unpassable_block(node):
+	for neighbor in node.planar_neighbors:
+		is_unpassable = True
+		for col_node in neighbor.entire_column:
+			# this time, if every neighbor already has a visited neighbor, we can't do it
+			if not col_node.empty or get_visited_neighbor_count(col_node) < 1:
+				is_unpassable = False
+				break
+		if is_unpassable:
+			# print "Unpassable block from switch blocked"
+			print node.x, node.y,"is not ok"
+			return True
+	print node.x,node.y,"is ok"
+	return False
+
 
 def make_move_if_valid(grid, n1, n2, move_type):
 	new_walls = []
 	# print move_type
 	if move_type is SWITCH and not n2.visited and not n2.is_column_taken:
+
+		
 	# if move_type is SWITCH and not n2.visited:
 
 		# print("Deleting column")
@@ -206,7 +244,7 @@ def make_move_if_valid(grid, n1, n2, move_type):
 				if visited_neighbor_us > 0 and visited_neighbor_other > 0:
 					ok_to_switch = False
 					break
-		if ok_to_switch:
+		if ok_to_switch and not switch_would_create_unpassable_block(n2):
 			# print (() if n1 is None else (n1.x, n1.y, n1.color)), (n2.x, n2.y, n2.color), switch_color
 			# print("Ok to delete")
 			for node in n2.entire_column:
@@ -231,8 +269,10 @@ def make_move_if_valid(grid, n1, n2, move_type):
 	elif move_type is DRILL:
 		# turning a wall into a colored block
 		if not n2.visited and not n2.is_column_taken:
+			if drill_would_create_unpassable_block(n2):
+				return []
 			# only care if it's empty or if it won't create a loop
-			if n2.empty or get_visited_neighbor_count(n2) < 2:
+			elif n2.empty or get_visited_neighbor_count(n2) < 2:
 				# now we're exploring a new node
 				new_walls.extend(mark_visited(n2))
 				# TODO need to mark is_column_taken to true for every node in column
@@ -297,7 +337,7 @@ def node_to_char(node):
 	if empty_count == 0:
 		# in the future there should not be any unpassable blocks at all
 		# but for now just replace them with white blocks
-		return 'w'
+		return '#'
 	elif empty_count == 1:
 		return colors[empty_color].lower()
 	elif empty_count == 8:
@@ -322,8 +362,8 @@ def print_grid(grid, width, height, start=(0, 0), end=None):
 			row += node_to_char(grid[i][j][0]) + ' '
 		print row
 
-width = 20
-height = 20
+width = 3
+height = 3
 grid = generate(width, height, 0, 0)
 block, dist = pick_end_block(grid[0][0][0], width, height)
 for color in xrange(8):
