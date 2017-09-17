@@ -291,7 +291,7 @@ def pick_end_block(start, width, height):
 					min_dist = distances[x][y][color]
 			if min_dist > max_distance and min_dist < 100000:
 				max_distance = min_dist
-
+				end_block = (x, y)
 	
 	return end_block, max_distance
 
