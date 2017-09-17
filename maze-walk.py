@@ -223,8 +223,6 @@ def make_move_if_valid(grid, n1, n2, move_type):
 					# print("Deleting color %d" % color)
 					new_walls.extend(mark_visited(node_to_switch))
 
-			#TODO choose to add switch or leave it be
-			# maybe this is all we need
 		else:
 			pass
 			# print("not ok to switch")
@@ -269,20 +267,32 @@ def pick_end_block(start, width, height):
 	max_distance = 0
 	end_block = (0, 0)
 	queue = [start]
+	start.searched = True
 	while len(queue) > 0:
-		node = queue.pop()
-		node.searched = True
+		node = queue[0]
+		del queue[0]
 		if node.empty:
-			for neighbor in node.planar_neighbors + [node.switched_node]:
-				if not neighbor is None:
-					if neighbor.searched and neighbor.empty:
-						distances[node.x][node.y][node.color] = distances[neighbor.x][neighbor.y][neighbor.color] + 1
-					elif neighbor.visited:
-						queue.insert(0, neighbor)
-			min_dist = min([distances[n.x][n.y][n.color] for n in node.entire_column])
-			if min_dist > max_distance:
+			if node.is_switch:
+				planar_neighbors = node.switched_node.planar_neighbors
+			else:
+				planar_neighbors = node.planar_neighbors
+			for neighbor in planar_neighbors:
+				if neighbor.empty and neighbor.searched is False:
+					distances[neighbor.x][neighbor.y][neighbor.color] = distances[node.x][node.y][node.color] + 1
+					neighbor.searched = True
+					queue.append(neighbor)
+
+	max_distance = 0
+	for x in xrange(width):
+		for y in xrange(height):
+			min_dist = 1000000
+			for color in xrange(8):
+				if distances[x][y][color] < min_dist:
+					min_dist = distances[x][y][color]
+			if min_dist > max_distance and min_dist < 100000:
 				max_distance = min_dist
-				end_block = (node.x, node.y)
+
+	
 	return end_block, max_distance
 
 
@@ -322,8 +332,8 @@ def print_grid(grid, width, height, start=(0, 0), end=None):
 			row += node_to_char(grid[i][j][0]) + ' '
 		print row
 
-width = 20
-height = 20
+width = 10
+height = 10
 grid = generate(width, height, 0, 0)
 block, dist = pick_end_block(grid[0][0][0], width, height)
 for color in xrange(8):
