@@ -1,4 +1,3 @@
-
 import random
 
 SWITCH = 1
@@ -102,6 +101,8 @@ def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, dri
 					switch_walls.append(wall)
 			else:
 				drill_walls.append(wall)
+		# WARNING POOR TIME COMPLEXITY NOT O(1)!!!!!
+		# TODO FIX THIS
 		del walls[index]
 
 	# replace_black_blocks(grid)
@@ -272,26 +273,28 @@ def pick_end_block(start, width, height):
 		node = queue[0]
 		del queue[0]
 		if node.empty:
-			if node.is_switch:
-				planar_neighbors = node.switched_node.planar_neighbors
-			else:
-				planar_neighbors = node.planar_neighbors
-			for neighbor in planar_neighbors:
-				if neighbor.empty and neighbor.searched is False:
-					distances[neighbor.x][neighbor.y][neighbor.color] = distances[node.x][node.y][node.color] + 1
-					neighbor.searched = True
-					queue.append(neighbor)
+			for neighbor in node.planar_neighbors:
+				node_to_add = neighbor
+				if neighbor.is_switch:
+					node_to_add = neighbor.switched_node
+				if node_to_add and node_to_add.searched is False:
+					distances[node_to_add.x][node_to_add.y][node_to_add.color] = distances[node.x][node.y][node.color] + 1
+					node_to_add.searched = True
+					queue.append(node_to_add)
 
 	max_distance = 0
-	for x in xrange(width):
-		for y in xrange(height):
+	for y in xrange(height):
+		y_str = ""
+		for x in xrange(width):
 			min_dist = 1000000
 			for color in xrange(8):
 				if distances[x][y][color] < min_dist:
 					min_dist = distances[x][y][color]
+			y_str += str(min_dist)
 			if min_dist > max_distance and min_dist < 100000:
 				max_distance = min_dist
 				end_block = (x, y)
+		print y_str
 	
 	return end_block, max_distance
 
@@ -320,6 +323,31 @@ def node_to_char(node):
 		# print "Invalid column"
 		# print [n.empty for n in node.entire_column]
 
+def stringify_grid(grid, width, height, start=(0, 0), end=None):
+	if end is None:
+		end = (width-1, height-1)
+	level_string = ""
+	level_string += "%d %d " % (start[0], start[1])
+	level_string += "%d %d " % (end[0], end[1])
+	level_string += "%d %d " % (width, height)
+	for j in xrange(height):
+		row = ""
+		for i in xrange(width):
+			row += node_to_char(grid[i][j][0]) + ' '
+		level_string += row
+	return level_string
+
+def build_level(width, height, start=(0, 0)):
+	grid = generate(width, height, 0, 0)
+	block, dist = pick_end_block(grid[0][0][0], width, height)
+	for color in xrange(8):
+		node = grid[block[0]][block[1]][color]
+		node.visited = True
+		node.empty = True
+		node.is_switch = True
+		node.switched_node = node
+	return stringify_grid(grid, width, height, start, end=block)
+
 def print_grid(grid, width, height, start=(0, 0), end=None):
 	if end is None:
 		end = (width-1, height-1)
@@ -332,20 +360,22 @@ def print_grid(grid, width, height, start=(0, 0), end=None):
 			row += node_to_char(grid[i][j][0]) + ' '
 		print row
 
-width = 10
-height = 10
-grid = generate(width, height, 0, 0)
-block, dist = pick_end_block(grid[0][0][0], width, height)
-for color in xrange(8):
-	node = grid[block[0]][block[1]][color]
-	node.visited = True
-	node.empty = True
-	node.is_switch = True
-	node.switched_node = node
-print_grid(grid, width, height, end=block)
-# print "End block"
-# print block
-print dist
+
+if __name__ == "__main__":
+	width = 3
+	height = 3
+	grid = generate(width, height, 0, 0)
+	block, dist = pick_end_block(grid[0][0][0], width, height)
+	"""for color in xrange(8):
+		node = grid[block[0]][block[1]][color]
+		node.visited = True
+		node.empty = True
+		node.is_switch = True
+		node.switched_node = node"""
+	print_grid(grid, width, height, end=block)
+	# print "End block"
+	# print block
+	print dist
 
 
 
