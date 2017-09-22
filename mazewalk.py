@@ -373,12 +373,12 @@ if __name__ == "__main__":
 	height = 3
 	grid = generate(width, height, 0, 0)
 	block, dist = pick_end_block(grid[0][0][0], width, height)
-	"""for color in xrange(8):
+	for color in xrange(8):
 		node = grid[block[0]][block[1]][color]
 		node.visited = True
 		node.empty = True
 		node.is_switch = True
-		node.switched_node = node"""
+		node.switched_node = node
 	print_grid(grid, width, height, end=block)
 	# print "End block"
 	# print block
