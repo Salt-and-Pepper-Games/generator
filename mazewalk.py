@@ -262,8 +262,11 @@ def replace_black_blocks(grid):
 
 
 # this doesn't work perfectly right now, sometimes distances are too big
+# finally we think this works
 def pick_end_block(start, width, height):
 	distances = [[[9999999999 for color in xrange(8)] for y in xrange(height)] for x in xrange(width)]
+	# we can only place the end block on an empty block (technically a switch) or on a switch
+	is_switch = [[False for y in xrange(height)] for x in xrange(width)]
 	distances[start.x][start.y][start.color] = 0
 	max_distance = 0
 	end_block = (0, 0)
@@ -278,14 +281,18 @@ def pick_end_block(start, width, height):
 				if neighbor.is_switch:
 					node_to_add = neighbor.switched_node
 				if node_to_add and node_to_add.searched is False:
+					if node_to_add.is_switch:
+						is_switch[node_to_add.x][node_to_add.y] = True
 					distances[node_to_add.x][node_to_add.y][node_to_add.color] = distances[node.x][node.y][node.color] + 1
 					node_to_add.searched = True
 					queue.append(node_to_add)
-
 	max_distance = 0
 	for y in xrange(height):
 		y_str = ""
 		for x in xrange(width):
+			# don't place the end on a block this can mess with things
+			if not is_switch[x][y]:
+				continue
 			min_dist = 1000000
 			for color in xrange(8):
 				if distances[x][y][color] < min_dist:
