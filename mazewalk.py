@@ -59,6 +59,9 @@ def get_neighbors(node):
 			neighbors.append(neighbor)
 	return neighbors
 
+def count_visited(neighbors):
+	return reduce(lambda total, curr: total + int(curr.visited), 0)
+
 def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, drill_prob=.3):
 	grid = build_grid(width, height)
 	walls = get_potential_neighboring_walls()
@@ -74,5 +77,10 @@ def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, dri
 		start, finish = walls.pop()
 		
 
+def is_drill_valid(start, finish):
+	if start.visited and not finish.column_taken and not finish.visited:
+		# check that it won't create a loop
 
+	else:
+		return False;
 
