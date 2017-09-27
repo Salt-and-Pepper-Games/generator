@@ -74,7 +74,7 @@ def i_can_reach(node):
 def check_drill_creates_loop(node):
 	visited_in_nodes = set(filter(lambda x:x.visited, can_reach_me(node)))
 	visited_out_nodes = set(filter(lambda x:x.visited, i_can_reach(node)))
-	return len(visited_in_nodes) > 0 and len(visited_out_nodes) > 0 and len(visited_in_nodes.difference(visited_out_nodes)) > 1
+	return len(visited_in_nodes) > 0 and len(visited_out_nodes) > 0 and len(visited_in_nodes.union(visited_out_nodes)) > 1
 
 def check_drill_creates_unpassables(node):
 	# only check planar neighbors because switch neighbors already have column taken and cannot become un-passable hence no need to resolve them
@@ -84,7 +84,7 @@ def check_drill_creates_unpassables(node):
 		for node_in_column in neighbor.entire_column:
 			empty_in_nodes = set(filter(lambda x:x.empty, can_reach_me(node_in_column)))
 			empty_out_nodes = set(filter(lambda x:x.empty, i_can_reach(node_in_column)))
-			if not (len(empty_in_nodes) > 0 and len(empty_out_nodes) > 0 and len(empty_in_nodes.difference(empty_out_nodes)) > 1):
+			if not (len(empty_in_nodes) > 0 and len(empty_out_nodes) > 0 and len(empty_in_nodes.union(empty_out_nodes)) > 1):
 				is_black_block = False
 				break
 		if is_black_block == True:
