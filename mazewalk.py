@@ -3,6 +3,9 @@ import random
 SWITCH = 1
 DRILL = 0
 
+def build_wall(start, finish, wall_type):
+	return (start, finish, wall_type)
+
 class Node:
 	def __init__(self, x, y, color):
 		self.planar_neighbors = []
@@ -100,6 +103,8 @@ def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, dri
 		# proposed a new edge between the start and the finish
 		start, finish = walls.pop()
 		
+		#TODO do the rest
+		
 
 def is_drill_valid(start, finish):
 	# we only drill on a filled column which is not taken
@@ -109,6 +114,7 @@ def is_drill_valid(start, finish):
 	else:
 		return False;
 
+# done
 def mark_drill_visited_and_get_walls(node):
 	new_walls = []
 	visited_nodes = []
@@ -123,10 +129,19 @@ def mark_drill_visited_and_get_walls(node):
 
 	return new_walls
 
-
+#done
 def visit_empty_neighbors(node):
 	# TODO flood fill empty neighbors and mark visited, return list of all nodes marked visited
+	visited_nodes = []
+	for neighbor in get_neighbors(node):
+		if neighbor.empty and not neighbor.visited:
+			neighbor.visited = True
+			visited_nodes.append(neighbor)
+			visited_nodes += visit_empty_neighbors(neighbor)
+	return visited_nodes
 
+
+#done
 def mark_drill_visited(node):
 	node.visited = True
 	node.empty = True
@@ -134,3 +149,7 @@ def mark_drill_visited(node):
 		col_neighbor.column_taken = True
 
 def get_new_walls(node):
+	new_walls = []
+	for neighbor in node.planar_neighbors:
+		if not neighbor.column_taken:
+			new_walls.append(build_wall(node, neighbor, DRILL))
