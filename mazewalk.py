@@ -70,6 +70,82 @@ def can_reach_me(node):
 def i_can_reach(node):
 	return get_neighbors(node)
 
+def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, drill_prob=.3):
+	grid = build_grid(width, height)
+	walls = mark_drill_visited_and_get_walls(grid[x_start][y_start][0])
+	while len(walls) > 0:
+		#O(1) randomization scheme
+		swap_indx = random.randint(0, len(walls) - 1)
+		old_wall = walls[-1]
+		idx = random.randint(0, len(walls) - 1)
+		walls[-1] = walls[swap_indx]
+		walls[swap_indx] = old_wall
+
+		# proposed a new edge between the start and the finish
+		start, finish, wall_type = walls.pop()
+		
+		#TODO do the rest
+		if wall_type == DRILL:
+			if is_drill_valid(start, finish):
+				walls += mark_drill_visited_and_get_walls(finish)
+	return grid
+
+"""
+FLOOD FILL AND WALL CODE 
+"""
+def get_new_walls(node):
+	new_walls = []
+	for neighbor in node.planar_neighbors:
+		if not neighbor.column_taken:
+			# add drill move
+			new_walls.append(build_wall(node, neighbor, DRILL))
+			# add switch moves
+			new_walls += [build_wall(neighbor, neighbor.entire_column[neighbor.color ^ switch_color], SWITCH) for switch_color in SWITCH_COLORS]
+	return new_walls
+
+def visit_empty_neighbors(node):
+	# TODO flood fill empty neighbors and mark visited, return list of all nodes marked visited
+	visited_nodes = []
+	for neighbor in get_neighbors(node):
+		if neighbor.empty and not neighbor.visited:
+			neighbor.visited = True
+			visited_nodes.append(neighbor)
+			visited_nodes += visit_empty_neighbors(neighbor)
+	return visited_nodes
+	
+"""
+--------------\
+DRILL CODE ++++	>
+--------------/
+"""
+def is_drill_valid(start, finish):
+	# we only drill on a filled column which is not taken
+	if start.visited and not finish.column_taken and not finish.visited:
+		# check that it won't create a loop
+		return not (check_drill_creates_loop(finish) or check_drill_creates_unpassables(finish))
+	else:
+		return False;
+
+def mark_drill_visited_and_get_walls(node):
+	new_walls = []
+	visited_nodes = []
+
+	mark_drill_visited(node)
+	visited_nodes.append(node)
+
+	visited_nodes += visit_empty_neighbors(node)
+
+	for new_node in visited_nodes:
+		new_walls += get_new_walls(new_node)
+
+	return new_walls
+
+def mark_drill_visited(node):
+	node.visited = True
+	node.empty = True
+	for col_neighbor in node.entire_column:
+		col_neighbor.column_taken = True
+
 # if we drill out this node will there be a loop
 def check_drill_creates_loop(node):
 	visited_in_nodes = set(filter(lambda x:x.visited, can_reach_me(node)))
@@ -91,79 +167,7 @@ def check_drill_creates_unpassables(node):
 			return True
 	return False
 
-def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, drill_prob=.3):
-	grid = build_grid(width, height)
-	walls = mark_drill_visited_and_get_walls(grid[x_start][y_start][0])
-	while len(walls) > 0:
-		#O(1) randomization scheme
-		swap_indx = random.randint(0, len(walls) - 1)
-		old_wall = walls[-1]
-		idx = random.randint(0, len(walls) - 1)
-		walls[-1] = walls[swap_indx]
-		walls[swap_indx] = old_wall
 
-		# proposed a new edge between the start and the finish
-		start, finish, wall_type = walls.pop()
-		
-		#TODO do the rest
-		if wall_type == DRILL:
-			if is_drill_valid(start, finish):
-				walls += mark_drill_visited_and_get_walls(finish)
-	return grid
-	
-#done
-def is_drill_valid(start, finish):
-	# we only drill on a filled column which is not taken
-	if start.visited and not finish.column_taken and not finish.visited:
-		# check that it won't create a loop
-		return not (check_drill_creates_loop(finish) or check_drill_creates_unpassables(finish))
-	else:
-		return False;
-
-#done
-def mark_drill_visited_and_get_walls(node):
-	new_walls = []
-	visited_nodes = []
-
-	mark_drill_visited(node)
-	visited_nodes.append(node)
-
-	visited_nodes += visit_empty_neighbors(node)
-
-	for new_node in visited_nodes:
-		new_walls += get_new_walls(new_node)
-
-	return new_walls
-
-#done
-def visit_empty_neighbors(node):
-	# TODO flood fill empty neighbors and mark visited, return list of all nodes marked visited
-	visited_nodes = []
-	for neighbor in get_neighbors(node):
-		if neighbor.empty and not neighbor.visited:
-			neighbor.visited = True
-			visited_nodes.append(neighbor)
-			visited_nodes += visit_empty_neighbors(neighbor)
-	return visited_nodes
-
-
-#done
-def mark_drill_visited(node):
-	node.visited = True
-	node.empty = True
-	for col_neighbor in node.entire_column:
-		col_neighbor.column_taken = True
-
-#done
-def get_new_walls(node):
-	new_walls = []
-	for neighbor in node.planar_neighbors:
-		if not neighbor.column_taken:
-			# add drill move
-			new_walls.append(build_wall(node, neighbor, DRILL))
-			# add switch moves
-			new_walls += [build_wall(neighbor, neighbor.entire_column[neighbor.color ^ switch_color], SWITCH) for switch_color in SWITCH_COLORS]
-	return new_walls
 
 grid = generate(4, 4, 0, 0)
 for i in xrange(4):
