@@ -72,7 +72,8 @@ def i_can_reach(node):
 
 def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, drill_prob=.3):
 	grid = build_grid(width, height)
-	mark_drill_visited(grid[x_start][y_start][0])
+	start = grid[x_start][y_start][0]
+	mark_switch_visited(start, 0)
 	walls = mark_neighbors_visited_and_get_walls(grid[x_start][y_start][0])
 	while len(walls) > 0:
 		#O(1) randomization scheme
@@ -93,6 +94,7 @@ def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, dri
 		elif wall_type == SWITCH:
 			switch_color = start.color ^ finish.color
 			if is_switch_valid(start, finish, switch_color):
+				print "Switch color %d" % switch_color
 				mark_switch_visited(finish, switch_color)
 				walls += mark_neighbors_visited_and_get_walls(finish)
 	return grid
@@ -168,7 +170,7 @@ DRILL CODE ++++	>
 """
 def is_drill_valid(start, finish):
 	# we only drill on a filled column which is not taken
-	if start.visited and not finish.column_taken and not finish.visited:
+	if start.visited and not finish.column_taken and not finish.color == 0 and not finish.visited:
 		# check that it won't create a loop
 		return not (check_creates_loop(finish) or check_creates_unpassables(finish))
 	else:
@@ -229,12 +231,12 @@ def node_to_char(node):
 	if empty_count == 0:
 		# in the future there should not be any unpassable blocks at all
 		# but for now just replace them with white blocks
-		return 'w'
+		return '#'
 	elif empty_count == 1:
 		return colors[empty_color].lower()
 	elif empty_count == 8:
 		if node.is_switch:
-			return colors[get_switch_color(node.color, node.switched_node.color)]
+			return colors[node.color ^ node.switched_node.color]
 		else:
 			return ' '
 	else:
