@@ -109,7 +109,7 @@ def get_new_walls(node):
 			# add drill move
 			new_walls.append(build_wall(node, neighbor, DRILL))
 			# add switch moves
-			new_walls += [build_wall(neighbor, neighbor.entire_column[neighbor.color ^ switch_color], SWITCH) for switch_color in SWITCH_COLORS]
+			new_walls += [build_wall(node, neighbor.entire_column[neighbor.color ^ switch_color], SWITCH) for switch_color in SWITCH_COLORS]
 	return new_walls
 
 def visit_empty_neighbors(node):
@@ -208,14 +208,14 @@ def mark_switch_visited(node, switch_color):
 
 def check_switch_creates_unpassables(node, switch_color):
 	column = node.entire_column
-	for color in len(column):
+	for color in xrange(len(column)):
 		if check_creates_unpassables(column[color], column[color ^ switch_color]):
 			return True
 	return False
 
 def check_switch_creates_loop(node, switch_color):
 	column = node.entire_column
-	for color in len(column):
+	for color in xrange(len(column)):
 		if check_creates_loop(column[color], column[color ^ switch_color]):
 			return True
 	return False
