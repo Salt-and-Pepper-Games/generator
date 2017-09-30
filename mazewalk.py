@@ -93,6 +93,8 @@ def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, dri
 				walls += mark_neighbors_visited_and_get_walls(finish)
 		elif wall_type == SWITCH:
 			switch_color = start.color ^ finish.color
+			print "Precheck Switch color %d" % switch_color
+			print (start.x, start.y), (finish.x, finish.y)
 			if is_switch_valid(start, finish, switch_color):
 				print "Switch color %d" % switch_color
 				mark_switch_visited(finish, switch_color)
@@ -144,24 +146,6 @@ def check_creates_loop(node, switched_node=None):
 	visited_out_nodes = set(filter(lambda x:x.visited, i_can_reach(node)))
 	return len(visited_in_nodes) > 0 and len(visited_out_nodes) > 0 and len(visited_in_nodes.union(visited_out_nodes)) > 1
 
-def check_creates_unpassables(node, switched_node=None):
-	if switched_node == None:
-		switched_node = node
-	# only check planar neighbors because switch neighbors already have column taken and cannot become un-passable hence no need to resolve them
-	filled_planar_neighbors = filter(lambda x:not x.column_taken, node.planar_neighbors)
-	for neighbor in filled_planar_neighbors:
-		is_black_block = True
-		for node_in_column in neighbor.entire_column:
-			empty_in_nodes = set(filter(lambda x:x.empty, can_reach_me(node_in_column)))
-			empty_in_nodes.add(node)
-			empty_out_nodes = set(filter(lambda x:x.empty, i_can_reach(node_in_column)))
-			empty_out_nodes.add(switched_node)
-			if not (len(empty_in_nodes) > 0 and len(empty_out_nodes) > 0 and len(empty_in_nodes.union(empty_out_nodes)) > 1):
-				is_black_block = False
-				break
-		if is_black_block == True:
-			return True
-	return False
 	
 """
 --------------\
@@ -172,7 +156,8 @@ def is_drill_valid(start, finish):
 	# we only drill on a filled column which is not taken
 	if start.visited and not finish.column_taken and not finish.color == 0 and not finish.visited:
 		# check that it won't create a loop
-		return not (check_creates_loop(finish) or check_creates_unpassables(finish))
+		# return not (check_creates_loop(finish) or check_drill_creates_unpassables(finish))
+		return not check_creates_loop(finish)
 	else:
 		return False;
 
@@ -195,6 +180,7 @@ SWITCH CODE
 def is_switch_valid(start, finish, switch_color):
 	if start.visited and not finish.column_taken and not finish.visited:
 		return not (check_switch_creates_unpassables(finish, switch_color) or check_switch_creates_loop(finish, switch_color))
+		#return not (check_switch_creates_loop(finish, switch_color))
 	else:
 		return False
 
@@ -207,10 +193,12 @@ def mark_switch_visited(node, switch_color):
 		col_neighbor.switched_node = node.entire_column[col_neighbor.color ^ switch_color]
 
 def check_switch_creates_unpassables(node, switch_color):
-	column = node.entire_column
-	for color in xrange(len(column)):
-		if check_creates_unpassables(column[color], column[color ^ switch_color]):
-			return True
+	# only check planar neighbors because switch neighbors already have column taken and cannot become un-passable hence no need to resolve them
+	filled_planar_neighbors = filter(lambda x:not x.column_taken, node.planar_neighbors)
+	for neighbor in filled_planar_neighbors:
+		for double_neighbor in neighbor.planar_neighbors:
+			if double_neighbor.is_switch:
+				return True
 	return False
 
 def check_switch_creates_loop(node, switch_color):
@@ -281,5 +269,7 @@ def print_grid(grid, width, height, start=(0, 0), end=None):
 			row += node_to_char(grid[i][j][0]) + ' '
 		print row
 
-grid = generate(4, 4, 0, 0)
-print_grid(grid, 4, 4)
+width = 70
+height = 70
+grid = generate(width, height, 0, 0)
+print_grid(grid, width, height)
