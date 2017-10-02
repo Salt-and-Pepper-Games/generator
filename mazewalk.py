@@ -23,6 +23,7 @@ class Node:
 		self.column_taken = False
 		self.is_switch = False
 		self.switched_node = None
+		self.distance_from_start = None
 
 		self.searched = False
 
@@ -73,6 +74,7 @@ def i_can_reach(node):
 def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, drill_prob=.3):
 	grid = build_grid(width, height)
 	start = grid[x_start][y_start][0]
+	start.distance_from_start = 0
 	mark_switch_visited(start, 0)
 	walls = mark_neighbors_visited_and_get_walls(grid[x_start][y_start][0])
 	while len(walls) > 0:
@@ -90,14 +92,13 @@ def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, dri
 		if wall_type == DRILL:
 			if is_drill_valid(start, finish):
 				mark_drill_visited(finish)
+				finish.distance_from_start = start.distance_from_start + 1
 				walls += mark_neighbors_visited_and_get_walls(finish)
 		elif wall_type == SWITCH:
 			switch_color = start.color ^ finish.color
-			print "Precheck Switch color %d" % switch_color
-			print (start.x, start.y), (finish.x, finish.y)
 			if is_switch_valid(start, finish, switch_color):
-				print "Switch color %d" % switch_color
 				mark_switch_visited(finish, switch_color)
+				finish.distance_from_start = start.distance_from_start + 1
 				walls += mark_neighbors_visited_and_get_walls(finish)
 	return grid
 
@@ -120,6 +121,7 @@ def visit_empty_neighbors(node):
 	for neighbor in get_neighbors(node):
 		if neighbor.empty and not neighbor.visited:
 			neighbor.visited = True
+			neighbor.distance_from_start = node.distance_from_start + 1
 			visited_nodes.append(neighbor)
 			visited_nodes += visit_empty_neighbors(neighbor)
 	return visited_nodes
@@ -139,11 +141,16 @@ def mark_neighbors_visited_and_get_walls(node):
 
 
 # if we drill out this node will there be a loop
-def check_creates_loop(node, switched_node=None):
+def check_creates_loop(node, switched_node=None, verbose = False):
 	if switched_node == None:
 		switched_node = node
-	visited_in_nodes = set(filter(lambda x:x.visited, can_reach_me(switched_node)))
-	visited_out_nodes = set(filter(lambda x:x.visited, i_can_reach(node)))
+	visited_in_nodes = set(map(lambda x:(x.x,x.y,x.color), filter(lambda x:x.visited, can_reach_me(switched_node))))
+	visited_out_nodes = set(map(lambda x:(x.x,x.y,x.color), filter(lambda x:x.visited, i_can_reach(node))))
+	if verbose:
+		print node.color
+		print "can reach me " + str(visited_in_nodes)
+		print "I can reach " + str(visited_out_nodes)
+		print "union " + str(visited_in_nodes.union(visited_out_nodes))
 	return len(visited_in_nodes) > 0 and len(visited_out_nodes) > 0 and len(visited_in_nodes.union(visited_out_nodes)) > 1
 
 	
@@ -208,6 +215,28 @@ def check_switch_creates_loop(node, switch_color):
 			return True
 	return False
 
+# Notes on black blocks
+# Can always replace UNLESS you can reach the spot with every color and a switch is next to you
+# in this case does it matter if we create a loop (there are probably two colors for which it wouldn't make a huge difference)?
+# should we prevent this?
+def eliminate_black_blocks(grid, width, height):
+	for x in xrange(width):
+		for y in xrange(height):
+			if grid[x][y][0].column_taken:
+				continue
+			success = False
+			print "Attempting to replaced black block @ " + str((x,y))
+			for color in xrange(1, 8):
+				if not check_creates_loop(grid[x][y][color], None, True):
+					mark_drill_visited(grid[x][y][color])
+					mark_neighbors_visited_and_get_walls(grid[x][y][color])
+					success = True
+					print "replaced black block @ " + str((x,y)) + " with color " + str(color)
+					break
+			if not success:
+				print "FUCK"
+	return grid
+
 def node_to_char(node):
 	empty_count = 0
 	empty_color = None
@@ -269,7 +298,10 @@ def print_grid(grid, width, height, start=(0, 0), end=None):
 			row += node_to_char(grid[i][j][0]) + ' '
 		print row
 
-width = 70
-height = 70
+width = 4
+height = 4
+print "GO/ GO/  GO"
 grid = generate(width, height, 0, 0)
 print_grid(grid, width, height)
+#grid = eliminate_black_blocks(grid, width, height)
+#print_grid(grid, width, height)
