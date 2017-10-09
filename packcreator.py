@@ -8,7 +8,7 @@ def main(argv):
 	numLevels = 100
 	packName = argv[1]
 	color = argv[2]
-	levelSize = 5
+	levelSize = 6
 	
 	pack = {}
 
