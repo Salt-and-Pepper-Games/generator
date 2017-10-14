@@ -29,21 +29,28 @@ class BranchInfo:
 #  - Resolving black blocks isn't really there yet should use distance to make sure not creating any major shortcuts
 
 class BranchHistory:
-	def __init__(self, main = False):
+	def __init__(self, node , main = False):
 		self.steps_since_last_type = [0,0,0]
 		self.distance_from_start = 0
 		self.main = False
+		# at what point did you branch off of main and how far are you from it?
+		self.main_branch_point = 0
+		# safe to fuse two branches if they come off from main at the same point
+
 		self.current_leaf = True
 		self.children = []
 		self.branch_worth = 0
+		self.node = node
+		# does the rest of your branch (including yourself) contain a switch? If not the end can't go on you
+		self.eligable = False
 		
-	def branch_from_parent(self, current_node_type):
+	def branch_from_parent(self, current_node_type, current_node):
 		# an attempt at a heuristic
 		# memory
 
-		new_history = BranchHistory()
+		new_history = BranchHistory(current_node)
 		for node_type in xrange(NODE_TYPES):
-			if node_type == current_node_type:
+			if node_type is current_node_type:
 				new_history.steps_since_last_type[node_type] = 0
 			else:
 				new_history.steps_since_last_type[node_type] = self.steps_since_last_type[node_type] + 1
@@ -63,35 +70,81 @@ class BranchHistory:
 	def score_child(self, current_node_type):
 		# an example heuristic function
 		#score += self.children * 3
-		"""if self.steps_since_last_type[SWITCH] > self.steps_since_last_type[DRILL]:
-			if current_node_type == "EMPTY":
-				score *= 1.2
-		if self.main:
-			score *= 1.1"""
-		return -len(self.children) + random.random()
+		score = 0
+		if current_node_type == SWITCH:
+			if self.steps_since_last_type[SWITCH] > self.steps_since_last_type[DRILL]:
+				score = 1
+			else:
+				score = 0
+		if current_node_type == DRILL:
+			if self.steps_since_last_type[DRILL] > self.steps_since_last_type[SWITCH]:
+				score = 1
+			else:
+				score = 0
+		#score *= len(self.children)
+		score = len(self.children)
+		return score + random.random() * 2
+
+	# TODO rename this function it is poorly named
+	def is_eligable(self):
+		self.eligable = self.node.is_switch and self.can_be_leaf()
+		for child in self.children:
+			if child.is_eligable():
+				self.eligable = True
+		return self.eligable
+
+	def can_be_leaf(self):
+		for col_neighbor in self.node.entire_column:
+				if col_neighbor.branch_history != None and col_neighbor != self.node:
+					return False
+		return True
 
 	def calculate_branch_worth(self):
 		# base case
-		if len(self.children) == 0:
-			self.branch_worth = self.distance_from_start
+		eligable_children = filter(lambda x:x.eligable, self.children)
+		if len(eligable_children) == 0:
+			return self.distance_from_start
 		else:
-			self.branch_worth = max(map(lambda child:child.calculate_branch_worth(), self.children))
+			self.branch_worth = max(map(lambda child:child.calculate_branch_worth(), eligable_children))
 		return self.branch_worth
 
 	# TODO currently this function returns it's branch as reversed.
-	def get_best_branch(self):
-		if len(self.children) == 0:
-			return [self]
+	def get_best_branch(self, depth = 0):
+		######
+		"""if depth == 0:
+			print "called" """
+		######
+		eligable_children = filter(lambda x:x.eligable, self.children)
+		illegitimate_children = filter(lambda x:not x.eligable, self.children)
+		if len(eligable_children) == 0:
+			#######
+			"""if not self.can_be_leaf():
+				print "Shit"
+				print "-----------"
+				print self.eligable
+				print self.branch_worth
+				print map(lambda x:(x.branch_worth, x.can_be_leaf()), self.children)
+				print "-----------"
+			#######"""
+			lst = [self]
 		else:
 			best_child_score = -10000
 			best_child = None
-			for child in self.children:
+			for child in eligable_children:
 				if child.branch_worth > best_child_score:
 					best_child_score = child.branch_worth
 					best_child = child
-			lst = best_child.get_best_branch()
+			lst = best_child.get_best_branch(depth + 1)
 			lst.append(self)
-			return lst
+		for child in illegitimate_children:
+			child.mark_as_offshoot_of_main(depth)
+		return lst  
+
+	# the idea here is to mark branches as offshoots of the main branch so can resolve how to fuse them to avoid black blocks if necessary
+	def mark_as_offshoot_of_main(self, branch_point):
+		self.main_branch_point = branch_point
+		for child in self.children:
+			child.mark_as_offshoot_of_main(branch_point)
 
 class Node:
 	def __init__(self, x, y, color):
@@ -177,17 +230,12 @@ def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, dri
 	grid = build_grid(width, height)
 	start = grid[x_start][y_start][0]
 	# start the main branch
-	start.branch_history = BranchHistory(main = True)
-	mark_switch_visited(start, 0)
-	wall_queue = push_walls_to_queue(mark_neighbors_visited_and_get_walls(grid[x_start][y_start][0]), [])
-	while len(wall_queue) > 0:
-		#O(1) randomization scheme
-		"""swap_indx = random.randint(0, len(walls) - 1)
-		old_wall = walls[-1]
-		idx = random.randint(0, len(walls) - 1)
-		walls[-1] = walls[swap_indx]
-		walls[swap_indx] = old_wall"""
+	start.branch_history = BranchHistory(start)
+	mark_switch_visited_and_get_walls(start, 0)
+	wall_queue = push_walls_to_queue(mark_neighbors_visited_and_get_walls(start), [])
+	#wall_queue = push_walls_to_queue(mark_switch_visited_and_get_walls(start, 0), [])
 
+	while len(wall_queue) > 0:
 		# proposed a new edge between the start and the finish
 		score, wall = pop_wall_from_queue(wall_queue)
 		start, finish, wall_type = wall
@@ -196,13 +244,14 @@ def generate(width, height, x_start, y_start, empty_prob=.5, switch_prob=.2, dri
 		if wall_type == DRILL:
 			if is_drill_valid(start, finish):
 				mark_drill_visited(finish)
-				finish.branch_history = start.branch_history.branch_from_parent(wall_type)
+				finish.branch_history = start.branch_history.branch_from_parent(wall_type, finish)
 				push_walls_to_queue(mark_neighbors_visited_and_get_walls(finish), wall_queue)
 		elif wall_type == SWITCH:
 			switch_color = start.color ^ finish.color
 			if is_switch_valid(start, finish, switch_color):
-				mark_switch_visited(finish, switch_color)
-				finish.branch_history = start.branch_history.branch_from_parent(wall_type)
+				#mark_switch_visited(finish, switch_color)
+				finish.branch_history = start.branch_history.branch_from_parent(wall_type, finish)
+				push_walls_to_queue(mark_switch_visited_and_get_walls(finish, switch_color), wall_queue)
 				push_walls_to_queue(mark_neighbors_visited_and_get_walls(finish), wall_queue)
 	return grid
 
@@ -226,7 +275,7 @@ def visit_empty_neighbors(node):
 		if neighbor.empty and not neighbor.visited:
 			neighbor.visited = True
 			# TODO this will either be switch or empty for now treat it as switch but add in empty later
-			neighbor.branch_history = node.branch_history.branch_from_parent(SWITCH)
+			neighbor.branch_history = node.branch_history.branch_from_parent(SWITCH, neighbor)
 			visited_nodes.append(neighbor)
 			visited_nodes += visit_empty_neighbors(neighbor)
 	return visited_nodes
@@ -253,6 +302,8 @@ def check_creates_loop(node, switched_node=None):
 # will a loop occur with the main branch?
 # note this idea should be expanded on later to try to branch as close to the start as possible
 # code could also probably be cleaned up to combine with previous function
+#
+# TODO move the experimental code to the a different function
 def check_creates_main_loop(node, switched_node=None):
 	if switched_node == None:
 		switched_node = node
@@ -261,9 +312,24 @@ def check_creates_main_loop(node, switched_node=None):
 	union = visited_in_nodes.union(visited_out_nodes)
 	does_intersect_main = False
 	for node in union:
-		if node.branch_history.main:
+		if node.branch_history.main == True:
 			does_intersect_main = True
 			break
+
+	# TODO move the experimental code to a different function
+	# START EXPERIMENT
+	chosen_branch = None
+	for node in union:
+		if chosen_branch == None:
+			if node.branch_history is not None:
+				chosen_branch = node.branch_history.main_branch_point
+		elif node.branch_history is not None and node.branch_history.main_branch_point != chosen_branch:
+			does_intersect_main = True
+			break
+	if chosen_branch is not None and not does_intersect_main:
+		print "Fused Branch " + str(chosen_branch)
+	# END EXPERIMENT
+
 	return len(visited_in_nodes) > 0 and len(visited_out_nodes) > 0 and len(union) > 1 and does_intersect_main
 
 	
@@ -304,13 +370,32 @@ def is_switch_valid(start, finish, switch_color):
 	else:
 		return False
 
-def mark_switch_visited(node, switch_color):
+def mark_switch_visited_and_get_walls(node, switch_color):
 	node.visited = True
+	new_walls = []
 	for col_neighbor in node.entire_column:
+		# Do not mark the current node
 		col_neighbor.empty = True
 		col_neighbor.column_taken = True
 		col_neighbor.is_switch = True
 		col_neighbor.switched_node = node.entire_column[col_neighbor.color ^ switch_color]
+		if col_neighbor == node:
+			continue
+		# EXPERIMENTAL
+		# mark visited if a neighbor is visited
+		for neighbor in can_reach_me(col_neighbor):
+			# only one neighbor should be visited
+			if neighbor.visited:
+				visited_node = col_neighbor.switched_node
+				# TODO verify that visiting the switched node is correct
+				visited_node.visited = True
+				# in this scenario the neighbor is the parent of col_neighbor
+				visited_node.branch_history = neighbor.branch_history.branch_from_parent(SWITCH, visited_node)
+				# TODO return these walls so we can extend along them as well
+				new_walls += mark_neighbors_visited_and_get_walls(visited_node)
+				break
+	return new_walls
+
 
 def check_switch_creates_unpassables(node, switch_color):
 	# only check planar neighbors because switch neighbors already have column taken and cannot become un-passable hence no need to resolve them
@@ -338,47 +423,50 @@ def eliminate_black_blocks(grid, width, height):
 			if grid[x][y][0].column_taken:
 				continue
 			success = False
-			print "Attempting to replaced black block @ " + str((x,y))
+			#print "Attempting to replaced black block @ " + str((x,y))
 			for color in xrange(1, 8):
 				if not check_creates_loop(grid[x][y][color], None):
 					# at this stage BranchHistory and distance_from_start mean nothing but it will still throw an error if we don't have it
 					# remove this dependency later
 					# but also potentially use it it could mean something if we wanted it to
-					grid[x][y][color].branch_history = BranchHistory(main = False)
+					grid[x][y][color].branch_history = BranchHistory(None)
 					mark_drill_visited(grid[x][y][color])
 					mark_neighbors_visited_and_get_walls(grid[x][y][color])
 					success = True
 					print "replaced black block @ " + str((x,y)) + " with color " + str(color)
 					break
 			if not success:
-				print "attempting to compromise"
+				#print "attempting to compromise"
 				for color in xrange(1, 8):
 					if not check_creates_main_loop(grid[x][y][color], None):
 						# once we transform a tree into a graph BranchHistory means nothing but it will still throw an error if we don't have it
 						# TODO remove this dependency later
-						grid[x][y][color].branch_history = BranchHistory(main = False)
+						grid[x][y][color].branch_history = BranchHistory(None)
 						mark_drill_visited(grid[x][y][color])
 						mark_neighbors_visited_and_get_walls(grid[x][y][color])
 						success = True
 						print "successfully compromised"
 						break
+			# If we don't succeed give up for now
 			if not success:
-				print "FUCK"
+				print "failure"
+				return None
 	return grid
 
 def node_to_char(node):
 	empty_count = 0
 	empty_color = None
-	colors = [' e ', ' R ', ' G ', ' Y ', ' B ', ' M ', ' C ', ' W ']
+	#colors = [' e ', ' R ', ' G ', ' Y ', ' B ', ' M ', ' C ', ' W ']
+	colors = ['e', 'R', 'G', 'Y', 'B', 'M', 'C', 'W']
 
-	total_leaf = False
+	"""total_leaf = False
 	for col_neighbor in node.entire_column:
 		if col_neighbor.branch_history is not None:
 			if col_neighbor.branch_history.main:
 				total_leaf = True
 				break
 	if total_leaf:
-		colors = ['(e)', '(R)', '(G)', '(Y)', '(B)', '(M)', '(C)', '(W)']
+		colors = ['(e)', '(R)', '(G)', '(Y)', '(B)', '(M)', '(C)', '(W)']"""
 
 
 	for col_neighbor in node.entire_column:
@@ -388,7 +476,7 @@ def node_to_char(node):
 	if empty_count == 0:
 		# in the future there should not be any unpassable blocks at all
 		# but for now just replace them with white blocks
-		return ' # '
+		return '#'
 	elif empty_count == 1:
 		return colors[empty_color].lower()
 	elif empty_count == 8:
@@ -401,32 +489,58 @@ def node_to_char(node):
 		# print "Invalid column"
 		# print [n.empty for n in node.entire_column]
 
-def get_end_block_location(grid, width, height):
-	for j in xrange(height):
-		for i in xrange(width):
-			if grid[i][j][0].is_end_of_level():
-				print "found end at " + str((i,j))
-	return (0,0)
-
-def stringify_grid(grid, width, height, start=(0, 0), end=None):
+def stringify_grid(grid, width, height, start=(0, 0), end=None, delimiter = ""):
 	if end is None:
 		end = (width-1, height-1)
 	level_string = ""
-	level_string += "%d %d " % (start[0], start[1])
-	level_string += "%d %d " % (end[0], end[1])
-	level_string += "%d %d " % (width, height)
+	level_string += "%d %d " % (start[0], start[1]) + delimiter
+	level_string += "%d %d " % (end[0], end[1]) + delimiter
+	level_string += "%d %d " % (width, height) + delimiter
 	for j in xrange(height):
 		row = ""
 		for i in xrange(width):
 			row += node_to_char(grid[i][j][0]) + ' '
-		level_string += row
+		level_string += row + delimiter
 	return level_string
 
 def build_level(width, height, start=(0, 0)):
  	grid = generate(width, height, 0, 0)
- 	grid = eliminate_black_blocks(grid, width, height)
- 	end = get_end_block_location(grid, width, height)
- 	return stringify_grid(grid, width, height, start, end=end)
+ 	# TODO put all of these complex steps into a simple wrapper method
+ 	start_node = grid[0][0][0]
+	start_node.branch_history.is_eligable()
+	start_node.branch_history.calculate_branch_worth()
+	path = start_node.branch_history.get_best_branch()
+
+	"""if len(path) < 10:
+		return None
+
+	print len(path)"""
+
+	for branch_history in path:
+		branch_history.main = True
+
+	end = (path[0].node.x, path[0].node.y)
+
+	old_string = stringify_grid(grid, width, height, start, end = end, delimiter = "\n")	
+
+
+	print "LEVEL LENGTH AND SOLUTION"
+	print len(path)
+	print list(reversed(map(lambda x:(x.node.x, x.node.y, x.node.color), path)))
+
+	print "THE END"
+	print map(lambda x:x.branch_history, path[0].node.entire_column)
+	print path[0].can_be_leaf()
+	print path[0].eligable
+	print (path[0].node.x, path[0].node.y)
+	print old_string
+
+	grid = eliminate_black_blocks(grid, width, height)
+	# fail on failure to remove all black blocks (rare but possible)
+	if grid is None:
+		return None
+
+ 	return grid, start, end
 
 def print_grid(grid, width, height, start=(0, 0), end=None):
 	if end is None:
@@ -440,26 +554,16 @@ def print_grid(grid, width, height, start=(0, 0), end=None):
 			row += node_to_char(grid[i][j][0]) + ' '
 		print row
 
-width = 6
-height = 6
-print "GO/ GO/  GO"
-grid = generate(width, height, 0, 0)
+def main():
+	width = 6
+	height = 6
+	#for i in xrange(20000):
+	lvl = build_level(width, height)
+	if lvl is not None:
+		grid, start, end = lvl
+		print_grid(grid, width, height)
+		#break
 
+if __name__ == "__main__":
+	main()
 
-start = grid[0][0][0]
-start.branch_history.calculate_branch_worth()
-path = start.branch_history.get_best_branch()
-
-for branch_history in path:
-	branch_history.main = True
-
-print ("---- P A T H ----")
-print len(path)
-print path
-
-
-#grid = eliminate_black_blocks(grid, width, height)
-end = get_end_block_location(grid, width, height)
-print_grid(grid, width, height, (0,0), end)
-#grid = eliminate_black_blocks(grid, width, height)
-#print_grid(grid, width, height)
