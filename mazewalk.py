@@ -82,7 +82,8 @@ class BranchHistory:
 			else:
 				score = 0
 		#score *= len(self.children)
-		score = len(self.children)
+		#score = len(self.children)
+		score = 0
 		return score + random.random() * 2
 
 	# TODO rename this function it is poorly named
@@ -379,7 +380,10 @@ def mark_switch_visited_and_get_walls(node, switch_color):
 		col_neighbor.column_taken = True
 		col_neighbor.is_switch = True
 		col_neighbor.switched_node = node.entire_column[col_neighbor.color ^ switch_color]
-		if col_neighbor == node:
+		if col_neighbor.switched_node == node:
+			"""col_neighbor.visited = True
+			new_walls += mark_neighbors_visited_and_get_walls(col_neighbor)"""
+			col_neighbor.switched_node.visited = True
 			continue
 		# EXPERIMENTAL
 		# mark visited if a neighbor is visited
@@ -499,14 +503,17 @@ def stringify_grid(grid, width, height, start=(0, 0), end=None, delimiter = ""):
 	for j in xrange(height):
 		row = ""
 		for i in xrange(width):
-			row += node_to_char(grid[i][j][0]) + ' '
+			if i == end[0] and j == end[1]:
+				row += 'e '
+			else:
+				row += node_to_char(grid[i][j][0]) + ' '
 		level_string += row + delimiter
 	return level_string
 
-def build_level(width, height, start=(0, 0)):
- 	grid = generate(width, height, 0, 0)
+def build_level(width, height, start=(0, 0), min_len = 10):
+ 	grid = generate(width, height, start[0], start[1])
  	# TODO put all of these complex steps into a simple wrapper method
- 	start_node = grid[0][0][0]
+ 	start_node = grid[start[0]][start[1]][0]
 	start_node.branch_history.is_eligable()
 	start_node.branch_history.calculate_branch_worth()
 	path = start_node.branch_history.get_best_branch()
@@ -523,22 +530,28 @@ def build_level(width, height, start=(0, 0)):
 
 	old_string = stringify_grid(grid, width, height, start, end = end, delimiter = "\n")	
 
+	if len(path) < min_len:
+		return None
 
-	print "LEVEL LENGTH AND SOLUTION"
-	print len(path)
-	print list(reversed(map(lambda x:(x.node.x, x.node.y, x.node.color), path)))
-
-	print "THE END"
-	print map(lambda x:x.branch_history, path[0].node.entire_column)
-	print path[0].can_be_leaf()
-	print path[0].eligable
-	print (path[0].node.x, path[0].node.y)
-	print old_string
+	l = path[0].can_be_leaf()
+	e = path[0].eligable
 
 	grid = eliminate_black_blocks(grid, width, height)
 	# fail on failure to remove all black blocks (rare but possible)
 	if grid is None:
 		return None
+
+	print "LEVEL LENGTH AND SOLUTION"
+	print len(path)
+	print list(reversed(map(lambda x:(x.node.x, x.node.y, x.node.color), path)))
+	print l
+	print e
+
+	print "THE END"
+	print map(lambda x:x.branch_history, path[0].node.entire_column)
+
+	print (path[0].node.x, path[0].node.y)
+	print old_string
 
  	return grid, start, end
 
@@ -566,4 +579,3 @@ def main():
 
 if __name__ == "__main__":
 	main()
-
