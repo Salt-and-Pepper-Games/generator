@@ -1,8 +1,19 @@
 import sys
-import requests
+# import requests
 import json
 import mazewalk
 import random
+from google.oauth2 import service_account
+from google.auth.transport.requests import AuthorizedSession
+
+scopes = [
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/firebase.database"
+]
+
+credentials = service_account.Credentials.from_service_account_file(
+        "serviceAccountKey.json", scopes=scopes)
+requests = AuthorizedSession(credentials)
 
 def main(argv):
 	# we will create a config file later for better options
@@ -29,12 +40,14 @@ def main(argv):
 			break
 
 	pack["packInfo"] = {'levelCount' : lvl_num - 1, 'packName' : packName, 'packColor' : color, 'packSize': levelSize}
-	pack_request = requests.put("https://prism-d2f60.firebaseio.com/levelData/" + packName + "Pack" + ".json", data=json.dumps(pack))
+	pack_request = requests.put("https://prism-d2f60.firebaseio.com/levelData/" + packName + "Pack" + ".json", json.dumps(pack))
 	print pack_request.text
 
-	packnames_request = requests.put("https://prism-d2f60.firebaseio.com/levelData/packNames/" + packName + ".json", data=json.dumps({packName:packName}))
+
+	packnames_request = requests.put("https://prism-d2f60.firebaseio.com/levelData/packNames/" + packName + ".json", json.dumps({packName:packName}))
 	print packnames_request.text
 
 
 if __name__ == "__main__":
 	main(sys.argv)
+
